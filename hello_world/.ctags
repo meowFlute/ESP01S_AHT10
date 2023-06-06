@@ -1,4 +1,6 @@
 --languages=c
+-L tags_files_used
+-h [".h.H.hh.hpp.hxx.h++"]
 --recurse
 --exclude="\.git"
 --totals=yes

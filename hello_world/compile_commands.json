@@ -3642,7 +3642,7 @@
    "-DMBEDTLS_CONFIG_FILE=mbedtls/esp_config.h",
    "-DCONFIG_SSL_USING_MBEDTLS",
    "-D",
-   "PROJECT_VER=\"95631e3\"",
+   "PROJECT_VER=\"143b96c-dirty\"",
    "-D",
    "PROJECT_NAME=\"hello-world\"",
    "-I",
