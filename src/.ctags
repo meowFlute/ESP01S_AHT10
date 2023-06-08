@@ -1,0 +1,7 @@
+--languages=C
+-L tags_files_used
+--recurse
+-h default
+--exclude="\.git"
+--totals=yes
+--C-kinds=+cdefglmnpstuvx
