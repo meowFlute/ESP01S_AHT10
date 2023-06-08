@@ -7,3 +7,6 @@ All it does it kick off a FreeRTOS process that looks at the chip information, a
 
 ## Monitor
 You can watch the process using `make monitor`
+
+## Changes
+The only thing I updated/changed was making it so that vim could see the appropriate ctags and include files for autocomplete and context switching in my programming environment.
