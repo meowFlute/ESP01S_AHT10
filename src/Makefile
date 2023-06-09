@@ -23,6 +23,9 @@ PROJECT_NAME=esp01s_aht10
 # EXTRA_COMPONENT_DIRS += $(PROJECT_PATH)/<component_name>
 # 
 # and then it would be similar to how their main makefile works
+PROJECT_PATH := $(abspath $(dir $(firstword $(MAKEFILE_LIST))))
+EXTRA_COMPONENT_DIRS += $(PROJECT_PATH)/tinyprintf
+ 
 
 # EXCLUDE_COMPONENTS
 # You can explicitly exclude components by listing them in this variable
