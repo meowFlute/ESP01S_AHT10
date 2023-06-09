@@ -50,8 +50,6 @@
 /* Driver Headers */
 #include "driver/i2c.h"
 
-static const char *TAG = "main";
-
 /**
  * TEST CODE BRIEF
  *
@@ -175,22 +173,19 @@ static esp_err_t i2c_master_aht10_write(i2c_port_t i2c_num, uint8_t reg_address,
  *     - ESP_ERR_INVALID_STATE I2C driver not installed or not in master mode.
  *     - ESP_ERR_TIMEOUT Operation timeout because the bus is busy.
  */
-static esp_err_t i2c_master_aht10_read(i2c_port_t i2c_num, uint8_t reg_address, uint8_t *data, size_t data_len)
+static esp_err_t i2c_master_aht10_read(i2c_port_t i2c_num, uint8_t *data, size_t data_len)
 {
+    /* we don't have to write a register address, it always just returns the
+     * following format:
+     * - byte 0 is the status byte
+     * - 20 bits of humidity data 
+     * - 20 bits of temperature data 
+     *
+     * NOTE: if the status bit isn't set, then the data is nonsense 
+     *       if you haven't triggered a measurement, the data is from the last
+     *       measurement (assuming the status bit says it is valid data) */
     int ret;
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, AHT10_SENSOR_ADDR << 1 | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_address, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, AHT10_SENSOR_ADDR << 1 | READ_BIT, ACK_CHECK_EN);
     i2c_master_read(cmd, data, data_len, LAST_NACK_VAL);
@@ -210,16 +205,20 @@ static esp_err_t i2c_master_aht10_init(i2c_port_t i2c_num)
     cmd_data[1] = AHT10_BYTE_ZEROS;
     /* this is where we send the init command to the aht10 */
     i2c_master_aht10_write(i2c_num, AHT10_CMD_INIT, cmd_data, 2); 
+    
+    /* is this needed? I'm not sure, but we'll try it both ways */
+    vTaskDelay(AHT10_CMD_DELAY / portTICK_RATE_MS);
 
     return ESP_OK;
 }
 
 static void i2c_task_aht10(void *arg)
 {
-    uint8_t sensor_data[14], busy;
+    uint8_t busy;
     uint8_t cmd_data[2];
-    static uint32_t error_count = 0;
-    int ret;
+    uint8_t rx_data[6];
+    uint32_t temperature_raw_data, humidity_raw_data;
+    float temperature, humidity;
 
     /* Basic flow
      * 1) Send the init command
@@ -245,20 +244,49 @@ static void i2c_task_aht10(void *arg)
             /* 3) wait some number of ms and read again */
             vTaskDelay(AHT10_MEAS_DELAY / portTICK_RATE_MS);
 
-            /* Perform a read */
+            /* Perform a read of the status byte */
+            i2c_master_aht10_read(I2C_AHT10_MASTER_NUM, rx_data, 6);
 
             /* check the busy bit */
-            if (/* not still busy */)
+            if ((rx_data[0] & AHT10_STATUS_BITS_BUSY) == AHT10_STATUS_BITS_BUSY)
+            {
+                /* device is still busy */
+                continue;
+            }
+            else
+            {
+                /* no longer busy */
                 busy = 0U;
+            }
         }
+        /* 4) we'll include raw data extraction in the transfer function part */
 
-        /* perform transfer function */
+        /* grab the 20-bit numbers for humidity and temperature */
+        /* humidity is the first 20 bits of bytes 1-3 */
+        humidity_raw_data = ((uint32_t)rx_data[1] << 16) | ((uint32_t)rx_data[2] << 8) | ((uint32_t)rx_data[3] >> 4);
+        
+        /* temperature is the final 20 bits of bytes 3-5 */
+        temperature_raw_data = (((uint32_t)rx_data[3] & 0x0F) << 16) | ((uint32_t)rx_data[4] << 8) | (uint32_t)rx_data[5];
+        
+        /* perform transfer functions */
+        /* humidity = (uint32_t / 2^20) * 100% */
+        /* I'll just leave it as a decimal instead of a percentage */
+        humidity = ((float)humidity_raw_data / (float)0x100000U);
+        
+        /* temperature = 200*(uint32_t / 2^20) - 50 */
+        temperature = (200.0F*((float)humidity_raw_data / (float)0x100000U)) - 50.0F;
 
         /* report data */
+        /* for debugging we'll output the data over serial */
+        printf("\nstatus byte = 0x%02X\n", rx_data[0]);
+        printf("\nhumidity raw data = 0x%08X\n", humidity_raw_data);
+        printf("temperature raw data = 0x%08X\n", temperature_raw_data);
+        printf("\nhumidity converted = %f", humidity);
+        printf("temperature converted = %f", temperature);
 
-        /* read once every 10 seconds 
+        /* read once every 5 seconds 
          * they recommend a maximum of once every 2 seconds */
-        vTaskDelay(10000 / portTICK_RATE_MS);
+        vTaskDelay(5000 / portTICK_RATE_MS);
     }
 
     i2c_driver_delete(I2C_AHT10_MASTER_NUM);
