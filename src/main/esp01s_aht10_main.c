@@ -51,27 +51,20 @@
 #include "driver/i2c.h"
 
 /**
- * TEST CODE BRIEF
+ * CODE BRIEF
  *
- * This example will show you how to use I2C module by running two tasks on i2c bus:
- *
- * - read external i2c sensor, here we use a AHT10 sensor for instance.
- * - Use one I2C port(master mode) to read or write the other I2C port(slave mode) on one ESP8266 chip.
+ * - read external i2c sensor, here we use a AHT10 sensor
  *
  * Pin assignment:
  *
  * - master:
- *    GPIO14 is assigned as the data signal of i2c master port
+ *    GPIO0 is assigned as the data signal of i2c master port
  *    GPIO2 is assigned as the clock signal of i2c master port
  *
  * Connection:
  *
- * - connect sda/scl of sensor with GPIO14/GPIO2
+ * - connect sda/scl of sensor with GPIO0/GPIO2
  * - no need to add external pull-up resistors, driver will enable internal pull-up resistors.
- *
- * Test items:
- *
- * - read the sensor data, if connected.
  */
 
 #define I2C_AHT10_MASTER_SCL_IO           2                   /*  gpio number for I2C master clock */
@@ -229,6 +222,7 @@ static void i2c_task_aht10(void *arg)
      * Loop 2-4 */
 
     /* 1) Send the init command */
+    printf("Initializing the AHT10\n");
     i2c_master_aht10_init(I2C_AHT10_MASTER_NUM);
 
     /* Loop 2-4 */
@@ -237,25 +231,32 @@ static void i2c_task_aht10(void *arg)
         /* 2) Send the measurement command */
         cmd_data[0] = AHT10_BYTE_MEASURE;
         cmd_data[1] = AHT10_BYTE_ZEROS;
+        printf("writing to the AHT10 to command a measure\n");
         i2c_master_aht10_write(I2C_NUM_0, AHT10_CMD_MEASURE, cmd_data, 2);
+
         busy = 1U; 
         while (busy)
         {
+            printf("Waiting for measurement delay\n");
+
             /* 3) wait some number of ms and read again */
             vTaskDelay(AHT10_MEAS_DELAY / portTICK_RATE_MS);
 
             /* Perform a read of the status byte */
+            printf("Reading from the AHT10\n");
             i2c_master_aht10_read(I2C_AHT10_MASTER_NUM, rx_data, 6);
 
             /* check the busy bit */
             if ((rx_data[0] & AHT10_STATUS_BITS_BUSY) == AHT10_STATUS_BITS_BUSY)
             {
                 /* device is still busy */
+                printf("Device is still busy\n");
                 continue;
             }
             else
             {
                 /* no longer busy */
+                printf("Device is no longer busy\n");
                 busy = 0U;
             }
         }
@@ -278,22 +279,25 @@ static void i2c_task_aht10(void *arg)
 
         /* report data */
         /* for debugging we'll output the data over serial */
-        printf("\nstatus byte = 0x%02X\n", rx_data[0]);
-        printf("\nhumidity raw data = 0x%08X\n", humidity_raw_data);
-        printf("temperature raw data = 0x%08X\n", temperature_raw_data);
-        printf("\nhumidity converted = %f", humidity);
-        printf("temperature converted = %f", temperature);
+        printf("status byte 0 = 0x%02X\n\n", rx_data[0]);
+        printf("data bytes 1-5 = 0x%02X%02X%02X%02X%02X\n\n", rx_data[1], rx_data[2], rx_data[3], rx_data[4], rx_data[5]);
+        printf("humidity raw data = 0x%08X\n", humidity_raw_data);
+        printf("temperature raw data = 0x%08X\n\n", temperature_raw_data);
+        printf("humidity converted = %.3f\n", humidity);
+        printf("temperature converted = %.3f\n\n", temperature);
 
         /* read once every 5 seconds 
          * they recommend a maximum of once every 2 seconds */
         vTaskDelay(5000 / portTICK_RATE_MS);
     }
-
+    fflush(stdout);
     i2c_driver_delete(I2C_AHT10_MASTER_NUM);
 }
 
 void app_main(void)
 {
+    printf("Hello AHT10!\n");
+
     //start i2c task
     xTaskCreate(i2c_task_aht10, "i2c_task_aht10", 2048, NULL, 10, NULL);
 }
