@@ -285,7 +285,6 @@
 /home/scott/expressif/ESP8266_RTOS_SDK/components/lwip/port/esp8266/netif/dhcp_state.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/lwip/port/esp8266/netif/wlanif.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/lwip/port/esp8266/debug/lwip_debug.c
-/home/scott/expressif/ESP01S_AHT10/src/main/hello_world_main.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/mbedtls/mbedtls/library/aes.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/mbedtls/mbedtls/library/aesni.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/mbedtls/mbedtls/library/arc4.c
@@ -529,6 +528,7 @@
 /home/scott/expressif/ESP8266_RTOS_SDK/components/wpa_supplicant/src/wps/wps_enrollee.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/wpa_supplicant/src/wps/wps_registrar.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/wpa_supplicant/src/wps/wps_validate.c
+/home/scott/expressif/ESP01S_AHT10/src/main/esp01s_aht10_main.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/spiffs/spiffs/src/test/testrunner.h
 /home/scott/expressif/ESP8266_RTOS_SDK/components/spiffs/spiffs/src/test/params_test.h
 /home/scott/expressif/ESP8266_RTOS_SDK/components/spiffs/spiffs/src/test/test_spiffs.h
