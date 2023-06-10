@@ -204,17 +204,27 @@ static esp_err_t i2c_master_aht10_read(i2c_port_t i2c_num, uint8_t *data, size_t
 static esp_err_t i2c_master_aht10_init(i2c_port_t i2c_num)
 {
     uint8_t cmd_data[2];
+    uint8_t read_data[6];
+    uint8_t register_value = 0x10;
     vTaskDelay(AHT10_DELAY_PWR_ON / portTICK_RATE_MS);
     i2c_master_init();  // set the i2c master parameters for the esp8266
-    cmd_data[0] = AHT10_INIT_REG_NORMAL | AHT10_INIT_REG_CAL; 
-    cmd_data[1] = AHT10_BYTE_ZEROS;
-    /* this is where we send the init command to the aht10 */
-    i2c_master_aht10_write(i2c_num, AHT10_CMD_INIT, cmd_data, 2); 
+    
+    //while (register_value != 0x00)
+    //{
+        printf("Attempting to write normal mode\n");
+        cmd_data[0] = AHT10_INIT_REG_NORMAL; 
+        cmd_data[1] = AHT10_BYTE_ZEROS;
+        /* this is where we send the init command to the aht10 */
+        i2c_master_aht10_write(i2c_num, AHT10_CMD_INIT, cmd_data, 1); 
     
 #if DELAY_AFTER_CMD
-    /* is this needed? I'm not sure, but we'll try it both ways */
-    vTaskDelay(AHT10_DELAY_CMD / portTICK_RATE_MS);
+        /* is this needed? I'm not sure, but we'll try it both ways */
+        vTaskDelay(AHT10_DELAY_CMD / portTICK_RATE_MS);
 #endif
+        i2c_master_aht10_read(I2C_AHT10_MASTER_NUM, read_data, 6);
+        register_value = read_data[0]; // read bits 5 and 6
+        printf("Register value = 0x%02X\n", register_value);
+    //}
 
     return ESP_OK;
 }
