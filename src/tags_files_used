@@ -529,6 +529,7 @@
 /home/scott/expressif/ESP8266_RTOS_SDK/components/wpa_supplicant/src/wps/wps_registrar.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/wpa_supplicant/src/wps/wps_validate.c
 /home/scott/expressif/ESP01S_AHT10/src/main/esp01s_aht10_main.c
+/home/scott/expressif/ESP01S_AHT10/src/tinyprintf/tinyprintf.c
 /home/scott/expressif/ESP8266_RTOS_SDK/components/spiffs/spiffs/src/test/testrunner.h
 /home/scott/expressif/ESP8266_RTOS_SDK/components/spiffs/spiffs/src/test/params_test.h
 /home/scott/expressif/ESP8266_RTOS_SDK/components/spiffs/spiffs/src/test/test_spiffs.h

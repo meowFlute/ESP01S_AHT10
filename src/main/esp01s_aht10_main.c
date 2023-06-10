@@ -50,6 +50,8 @@
 /* Driver Headers */
 #include "driver/i2c.h"
 
+/* tinyprintf so I can printf floats */
+
 /**
  * CODE BRIEF
  *
@@ -66,6 +68,13 @@
  * - connect sda/scl of sensor with GPIO0/GPIO2
  * - no need to add external pull-up resistors, driver will enable internal pull-up resistors.
  */
+#ifndef TRUE
+#define TRUE                              1
+#endif
+#ifndef FALSE
+#define FALSE                             0
+#endif
+#define DELAY_AFTER_CMD                   TRUE                /* 1 means that it'll delay after CMD issuing, otherwise  */
 
 #define I2C_AHT10_MASTER_SCL_IO           2                   /*  gpio number for I2C master clock */
 #define I2C_AHT10_MASTER_SDA_IO           0                   /*  gpio number for I2C master data  */
@@ -83,14 +92,17 @@
 #define AHT10_BYTE_ZEROS                    (uint8_t)0x00       /* dummy zero data byte */
 #define AHT10_BYTE_MEASURE                  (uint8_t)0x33       /* measure data byte shown in datasheet */
 #define AHT10_MEAS_DELAY                    80                  /* check every N milliseconds for measurement complete */
-#define AHT10_PWR_ON_DELAY                  50                  /* milliseconds to wait after power on */
-#define AHT10_CMD_DELAY                     350                 /* even though this isn't in the datasheet this seems important */
-#define AHT10_SOFT_RESET_DELAY              20                  /* should we need to soft reset, it takes less than 20ms */
+#define AHT10_DELAY_PWR_ON                  50                  /* milliseconds to wait after power on */
+#define AHT10_DELAY_CMD                     350                 /* even though this isn't in the datasheet this seems important */
+#define AHT10_DELAY_SOFT_RESET              20                  /* should we need to soft reset, it takes less than 20ms */
 #define AHT10_SENSOR_ADDR                   0x38                /* slave address for AHT10 sensor */
-#define AHT10_CMD_NORMAL_MODE               0xA8                /* No info in the data sheet on this, but it sleeps between measurement */
 #define AHT10_CMD_INIT                      0xE1                /* Command to initialize the device */
 #define AHT10_CMD_MEASURE                   0xAC                /* Command to measure temperature and humidity (and send response after delay) */
 #define AHT10_CMD_SOFTRESET                 0xBA                /* Command to perform a soft reset (<20ms delay) */
+#define AHT10_INIT_REG_NORMAL               0x00                /* sleep between measurements */
+#define AHT10_INIT_REG_CYCLE                0x20                /* continuous measurement */
+#define AHT10_INIT_REG_CMD                  0x40                /* command mode */
+#define AHT10_INIT_REG_CAL                  0x08                /* calibration something or other */
 #define AHT10_STATUS_BITS_BUSY              0x40                /* Status bit indicating busy (measuring) status */
 #define AHT10_STATUS_BITS_MODE              0x30                /* Mode meanings: 00 is NOR, 01 is CYC, 1X is CMD */
 #define AHT10_STATUS_BITS_CAL               0x04                /* Cal bit (set if calibrated) */
@@ -192,15 +204,17 @@ static esp_err_t i2c_master_aht10_read(i2c_port_t i2c_num, uint8_t *data, size_t
 static esp_err_t i2c_master_aht10_init(i2c_port_t i2c_num)
 {
     uint8_t cmd_data[2];
-    vTaskDelay(AHT10_PWR_ON_DELAY / portTICK_RATE_MS);
+    vTaskDelay(AHT10_DELAY_PWR_ON / portTICK_RATE_MS);
     i2c_master_init();  // set the i2c master parameters for the esp8266
-    cmd_data[0] = AHT10_BYTE_ZEROS;  // dummy data, the command is the register address here
+    cmd_data[0] = AHT10_INIT_REG_NORMAL | AHT10_INIT_REG_CAL; 
     cmd_data[1] = AHT10_BYTE_ZEROS;
     /* this is where we send the init command to the aht10 */
     i2c_master_aht10_write(i2c_num, AHT10_CMD_INIT, cmd_data, 2); 
     
+#if DELAY_AFTER_CMD
     /* is this needed? I'm not sure, but we'll try it both ways */
-    vTaskDelay(AHT10_CMD_DELAY / portTICK_RATE_MS);
+    vTaskDelay(AHT10_DELAY_CMD / portTICK_RATE_MS);
+#endif
 
     return ESP_OK;
 }
@@ -264,7 +278,7 @@ static void i2c_task_aht10(void *arg)
 
         /* grab the 20-bit numbers for humidity and temperature */
         /* humidity is the first 20 bits of bytes 1-3 */
-        humidity_raw_data = ((uint32_t)rx_data[1] << 16) | ((uint32_t)rx_data[2] << 8) | ((uint32_t)rx_data[3] >> 4);
+        humidity_raw_data = ((uint32_t)rx_data[1] << 12) | ((uint32_t)rx_data[2] << 4) | ((uint32_t)rx_data[3] >> 4);
         
         /* temperature is the final 20 bits of bytes 3-5 */
         temperature_raw_data = (((uint32_t)rx_data[3] & 0x0F) << 16) | ((uint32_t)rx_data[4] << 8) | (uint32_t)rx_data[5];
@@ -272,10 +286,19 @@ static void i2c_task_aht10(void *arg)
         /* perform transfer functions */
         /* humidity = (uint32_t / 2^20) * 100% */
         /* I'll just leave it as a decimal instead of a percentage */
-        humidity = ((float)humidity_raw_data / (float)0x100000U);
+        humidity = (float)humidity_raw_data;
+        humidity /= 1048576.0F;
         
         /* temperature = 200*(uint32_t / 2^20) - 50 */
-        temperature = (200.0F*((float)humidity_raw_data / (float)0x100000U)) - 50.0F;
+        printf("\ntemperature before cast to float: %d\n", temperature_raw_data);
+        temperature = (float)temperature_raw_data;
+        printf("temperature after cast to float: %f\n", temperature);
+        temperature *= 200.0F;
+        printf("temperature after multiplication by 200.0F: %f\n", temperature);
+        temperature /= 1048576.0F;
+        printf("temperature after division by 1048576.0F: %f\n", temperature);
+        temperature -= 50.0F;
+        printf("temperature after subtraction of 50.0F: %f\n\n", temperature);
 
         /* report data */
         /* for debugging we'll output the data over serial */
@@ -283,8 +306,8 @@ static void i2c_task_aht10(void *arg)
         printf("data bytes 1-5 = 0x%02X%02X%02X%02X%02X\n\n", rx_data[1], rx_data[2], rx_data[3], rx_data[4], rx_data[5]);
         printf("humidity raw data = 0x%08X\n", humidity_raw_data);
         printf("temperature raw data = 0x%08X\n\n", temperature_raw_data);
-        printf("humidity converted = %.3f\n", humidity);
-        printf("temperature converted = %.3f\n\n", temperature);
+        printf("humidity converted = %f\n", humidity);
+        printf("temperature converted = %f\n\n", temperature);
 
         /* read once every 5 seconds 
          * they recommend a maximum of once every 2 seconds */

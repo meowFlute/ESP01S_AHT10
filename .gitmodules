@@ -1,3 +1,0 @@
-[submodule "src/tinyprintf"]
-	path = src/tinyprintf
-	url = git@github.com:meowFlute/tinyprintf.git
